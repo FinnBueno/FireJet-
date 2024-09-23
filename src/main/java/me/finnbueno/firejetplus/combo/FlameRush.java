@@ -139,7 +139,7 @@ public class FlameRush extends OverriddenFireAbility implements ComboAbility, Ad
 		super.load();
 		FireUtil.registerLanguage(this, "With this combo, a firebender can greatly accelerate their FireJet, at the cost of steering capacity. To " +
 			"use, the FireJet charge bar must be charged to red. When activated, your FireJet will become much faster and knock aside anyone you hit. However, steering " +
-			"becomes nearly impossible.", FireUtil.generateComboInstructions(this));
+			"becomes nearly impossible.", "Instructions: Blaze (Shift Down) > FireBlast (Shift Up) > Charge FireJet to red");
 		ConfigValueHandler.get().registerDefaultValues(new FlameRush(), null);
 	}
 
@@ -169,6 +169,10 @@ public class FlameRush extends OverriddenFireAbility implements ComboAbility, Ad
 		}
 		FireJet jet = getAbility(player, FireJet.class);
 		if (jet != null) {
+			long timeSinceStart = System.currentTimeMillis() - jet.getStartTime();
+			if (timeSinceStart + 50 > jet.getMaxChargeTime()) {
+				return null;
+			}
 			jet.onFlyStart(() -> new FlameRush(player, jet));
 		}
 		return null;

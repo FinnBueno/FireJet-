@@ -3,6 +3,7 @@ package me.finnbueno.firejetplus.ability;
 import com.projectkorra.projectkorra.Element;
 import com.projectkorra.projectkorra.GeneralMethods;
 import com.projectkorra.projectkorra.ability.AddonAbility;
+import com.projectkorra.projectkorra.attribute.Attribute;
 import me.finnbueno.firejetplus.config.ConfigValue;
 import me.finnbueno.firejetplus.config.ConfigValueHandler;
 import me.finnbueno.firejetplus.listener.FireJetListener;
@@ -74,13 +75,16 @@ public class FireJet extends OverriddenFireAbility implements AddonAbility {
 	private State state;
 	private BossBar chargeBar;
 	private Vector direction;
+	@Attribute(Attribute.DURATION)
 	private double duration;
+	@Attribute(Attribute.SPEED)
 	private double speed;
 	private boolean ignite;
 	private long flyStart;
 	private Set<LivingEntity> lit;
 	private double chargeFactor;
 	private Runnable onFlyStart;
+	private boolean groundCheck = false;
 
 	/**
 	 * This constructor is used to generate config values, do not use
@@ -217,9 +221,19 @@ public class FireJet extends OverriddenFireAbility implements AddonAbility {
 					e.setFireTicks(fireTicks);
 				});
 		}
+		if (!groundCheck && flyTime > 250) {
+			groundCheck = true;
+		}
+		if (groundCheck) {
+			if (player.isOnGround()) {
+				removeWithCooldown();
+			}
+		}
 	}
 
 	private void playParticles() {
+		// I'd like to rewrite this so it's all behind the feet and lower to the ground, so it's more like the ground is being lit on fire
+		// fewer particles too
 		Particle particle = bPlayer.hasSubElement(Element.SubElement.BLUE_FIRE) ? Particle.SOUL_FIRE_FLAME : Particle.FLAME;
 		int amount = 15;
 		double offset = .8;
@@ -315,6 +329,10 @@ public class FireJet extends OverriddenFireAbility implements AddonAbility {
 		return this.state;
 	}
 
+	public long getMaxChargeTime() {
+		return maxChargeTime;
+	}
+
 	private double clamp(double v) {
 		return Math.max(0, Math.min(1, v));
 	}
@@ -348,13 +366,14 @@ public class FireJet extends OverriddenFireAbility implements AddonAbility {
 	public void load() {
 		super.load();
 		listener = new FireJetListener(this);
-		FireUtil.registerLanguage(this, "This ability provides a firebender with great mobility and repositioning options. This move has 2 use with their own cooldowns.",
-			"\nJet: This function allows a firebender to fly using jets of fire. To use, hold shift. A bar will appear at the top of your screen to show charging progress. " +
+		FireUtil.registerLanguage(this, "FireJet gives firebenders great mobility and repositioning options through this ability and its combos.",
+			"\n§cJet: §fThis function allows a firebender to fly using jets of fire. To use, hold shift. A bar will appear at the top of your screen to show charging progress. " +
 			"At any point you can let go to start the move. The fuller the bar, the faster and longer you will fly. Switching slots during flight does not cancel the " +
 			"move, but instead locks the direction. Making turns during flight is limited to a certain angle.\n" +
-			"Dash: This function allows a firebender to make a single large jump in a direction. To do this, simply left click. Shortly after activating this and while still " +
+			"§cDash: §fThis function allows a firebender to make a single large jump in a direction. To do this, simply left click. Shortly after activating this and while still " +
 			"in the air, you may hold shift. When you do this, you start surfing across the ground for a longer period of time. Changing slots is also possible during this, " +
-			"and will also lock your direction. However, you must hold shift, or this move will stop.");
+			"and will also lock your direction. However, you must hold shift, or this move will stop.\n" +
+			"§cFireJet Jet and FireJet Dash have separate cooldowns!");
 		ConfigValueHandler.get().registerDefaultValues(new FireJet(), null);
 	}
 

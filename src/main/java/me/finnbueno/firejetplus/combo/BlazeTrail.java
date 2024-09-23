@@ -1,11 +1,13 @@
 package me.finnbueno.firejetplus.combo;
 
 import com.projectkorra.projectkorra.BendingPlayer;
+import com.projectkorra.projectkorra.GeneralMethods;
 import com.projectkorra.projectkorra.ability.ComboAbility;
 import com.projectkorra.projectkorra.ability.CoreAbility;
 import com.projectkorra.projectkorra.ability.util.ComboManager;
 import com.projectkorra.projectkorra.firebending.BlazeArc;
 import com.projectkorra.projectkorra.util.ClickType;
+import com.projectkorra.projectkorra.waterbending.plant.PlantRegrowth;
 import me.finnbueno.firejetplus.ability.FireJet;
 import me.finnbueno.firejetplus.ability.FireSki;
 import me.finnbueno.firejetplus.config.ConfigValue;
@@ -14,12 +16,14 @@ import me.finnbueno.firejetplus.util.FireUtil;
 import me.finnbueno.firejetplus.util.OverriddenFireAbility;
 import org.bukkit.Location;
 import org.bukkit.Sound;
+import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
 import org.bukkit.entity.Player;
 import org.bukkit.util.Vector;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 
 /**
@@ -38,6 +42,8 @@ public class BlazeTrail extends OverriddenFireAbility implements ComboAbility {
 	private double angle = 65;
 	@ConfigValue()
 	private boolean enabled = true;
+	@ConfigValue()
+	private long fireDuration = 4000;
 
 	private Location loc;
 	private FireSki ski;
@@ -79,18 +85,41 @@ public class BlazeTrail extends OverriddenFireAbility implements ComboAbility {
 		}
 		this.loc = loc;
 
-		Vector blazeDirection = ski.getDirection().multiply(-1);
-		for (double i = -angle / 2; i < angle / 2; i += ANGLE_INCREMENT) {
-			Location trailStart = this.loc.clone();
-			Vector v = blazeDirection.clone();
-			double rad = Math.toRadians(-i);
-			double cos = Math.cos(rad);
-			double sin = Math.sin(rad);
-			double x = v.getX() * cos - v.getZ() * sin;
-			double z = v.getX() * sin + v.getZ() * cos;
-			v.setX(x).setZ(z).normalize();
-			trailStart.add(v);
-			new BlazeArc(player, trailStart, v, size);
+		igniteBlocks();
+
+	}
+
+	private void igniteBlocks() {
+		Block belowBlock = player.getLocation().getBlock().getRelative(BlockFace.DOWN);
+		List<Block> blocksToIgnite = new ArrayList<>();
+		blocksToIgnite.add(belowBlock);
+		Block[] surroundingBlocks = {
+			// left, right, top, bottom
+			belowBlock.getLocation().add(.5, 0, 0).getBlock(),
+			belowBlock.getLocation().add(0, 0, .5).getBlock(),
+			belowBlock.getLocation().add(-.5, 0, 0).getBlock(),
+			belowBlock.getLocation().add(0, 0, -.5).getBlock(),
+
+			// corners
+			belowBlock.getLocation().add(.5, 0, .5).getBlock(),
+			belowBlock.getLocation().add(-.5, 0, .5).getBlock(),
+			belowBlock.getLocation().add(-.5, 0, -.5).getBlock(),
+			belowBlock.getLocation().add(.5, 0, -.5).getBlock(),
+		};
+		for (Block block : surroundingBlocks) {
+			if (!blocksToIgnite.contains(block)) {
+				blocksToIgnite.add(block);
+			}
+		}
+
+		for (Block block : blocksToIgnite) {
+			if (!isFire(block.getType()) && !isAir(block.getType()) && canFireGrief() && (isPlant(block) || isSnow(block))) {
+				new PlantRegrowth(this.player, block);
+			}
+
+			if (isIgnitable(block)) {
+				this.createTempFire(block.getLocation(), 4000);
+			}
 		}
 	}
 
