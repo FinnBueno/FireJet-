@@ -84,7 +84,11 @@ public class FireJet extends OverriddenFireAbility implements AddonAbility {
 	private Set<LivingEntity> lit;
 	private double chargeFactor;
 	private Runnable onFlyStart;
-	private boolean groundCheck = false;
+	private boolean checkForOnGround = false;
+	private boolean onGround = false;
+	private int ticksOnGround;
+	@ConfigValue()
+	private int maxTicksOnGround = 10;
 
 	/**
 	 * This constructor is used to generate config values, do not use
@@ -104,8 +108,8 @@ public class FireJet extends OverriddenFireAbility implements AddonAbility {
 		ConfigValueHandler.get().setFields(this);
 		this.state = State.CHARGING;
 		this.chargeBar = Bukkit.getServer().createBossBar(CHARGE_BAR_TITLE, BarColor.WHITE, BarStyle.SEGMENTED_10);
-		this.chargeBar.addPlayer(player);
 		this.chargeBar.setProgress(0);
+		this.chargeBar.addPlayer(player);
 		this.direction = player.getLocation().getDirection();
 		start();
 	}
@@ -142,14 +146,11 @@ public class FireJet extends OverriddenFireAbility implements AddonAbility {
 		}
 
 		// get the difference between the max and min charge time
-		double chargeDuration = maxChargeTime - minChargeTime;
+		double chargeDuration = maxChargeTime;
 		// subtract the minimum charge time from the time since start
 		double actualChargeTime = timeSinceStart - minChargeTime;
-		if (actualChargeTime <= 0) {
-			return;
-		}
 
-		double progress = bPlayer.isAvatarState() ? 1 : actualChargeTime / chargeDuration;
+		double progress = bPlayer.isAvatarState() ? 1 : timeSinceStart / chargeDuration;
 		// clamp progress in between 0 and 1
 		this.chargeBar.setProgress(clamp(progress));
 
@@ -221,12 +222,21 @@ public class FireJet extends OverriddenFireAbility implements AddonAbility {
 					e.setFireTicks(fireTicks);
 				});
 		}
-		if (!groundCheck && flyTime > 250) {
-			groundCheck = true;
+		if (!checkForOnGround && flyTime > 250) {
+			checkForOnGround = true;
 		}
-		if (groundCheck) {
-			if (player.isOnGround()) {
-				removeWithCooldown();
+		if (checkForOnGround) {
+			if (!onGround && player.isOnGround()) {
+				onGround = true;
+				ticksOnGround = 1;
+			} else if (onGround && player.isOnGround()) {
+				ticksOnGround++;
+				if (ticksOnGround > maxTicksOnGround) {
+					removeWithCooldown();
+				}
+			} else if (onGround && !player.isOnGround()) {
+				ticksOnGround = 0;
+				onGround = false;
 			}
 		}
 	}
