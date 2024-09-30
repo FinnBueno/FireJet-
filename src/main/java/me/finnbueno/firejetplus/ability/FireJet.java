@@ -3,7 +3,10 @@ package me.finnbueno.firejetplus.ability;
 import com.projectkorra.projectkorra.Element;
 import com.projectkorra.projectkorra.GeneralMethods;
 import com.projectkorra.projectkorra.ability.AddonAbility;
+import com.projectkorra.projectkorra.ability.CoreAbility;
 import com.projectkorra.projectkorra.attribute.Attribute;
+import com.projectkorra.projectkorra.firebending.combo.JetBlast;
+import com.projectkorra.projectkorra.firebending.combo.JetBlaze;
 import me.finnbueno.firejetplus.config.ConfigValue;
 import me.finnbueno.firejetplus.config.ConfigValueHandler;
 import me.finnbueno.firejetplus.listener.FireJetListener;
@@ -22,6 +25,7 @@ import org.bukkit.event.HandlerList;
 import org.bukkit.event.Listener;
 import org.bukkit.util.Vector;
 
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -86,6 +90,7 @@ public class FireJet extends OverriddenFireAbility implements AddonAbility {
 	private Runnable onFlyStart;
 	private boolean checkForOnGround = false;
 	private boolean onGround = false;
+	private boolean checkedForJetBlastBlaze = false;
 	private int ticksOnGround;
 	@ConfigValue()
 	private int maxTicksOnGround = 10;
@@ -190,7 +195,23 @@ public class FireJet extends OverriddenFireAbility implements AddonAbility {
 		}
 	}
 
+	private void checkForJetBlastBlaze() {
+		if (CoreAbility.hasAbility(player, JetBlast.class)) {
+			JetBlast jetBlast = CoreAbility.getAbility(player, JetBlast.class);
+			duration = jetBlast.getDuration();
+			speed = jetBlast.getSpeed();
+		} else if (CoreAbility.hasAbility(player, JetBlaze.class)) {
+			JetBlaze jetBlaze = CoreAbility.getAbility(player, JetBlaze.class);
+			duration = jetBlaze.getDuration();
+			speed = jetBlaze.getSpeed();
+		}
+	}
+
 	private void handleFlying() {
+		if (!checkedForJetBlastBlaze) {
+			checkForJetBlastBlaze();
+			checkedForJetBlastBlaze = true;
+		}
 		long flyTime = System.currentTimeMillis() - this.flyStart;
 		if (flyTime > this.duration && !bPlayer.isAvatarState()) {
 			removeWithCooldown();
