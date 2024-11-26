@@ -3,6 +3,10 @@ package me.finnbueno.firejetplus.ability;
 import com.projectkorra.projectkorra.Element;
 import com.projectkorra.projectkorra.GeneralMethods;
 import com.projectkorra.projectkorra.ability.AddonAbility;
+import com.projectkorra.projectkorra.ability.CoreAbility;
+import com.projectkorra.projectkorra.attribute.Attribute;
+import com.projectkorra.projectkorra.firebending.combo.JetBlast;
+import com.projectkorra.projectkorra.firebending.combo.JetBlaze;
 import me.finnbueno.firejetplus.config.ConfigValue;
 import me.finnbueno.firejetplus.config.ConfigValueHandler;
 import me.finnbueno.firejetplus.listener.FireJetListener;
@@ -21,6 +25,7 @@ import org.bukkit.event.HandlerList;
 import org.bukkit.event.Listener;
 import org.bukkit.util.Vector;
 
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -74,13 +79,21 @@ public class FireJet extends OverriddenFireAbility implements AddonAbility {
 	private State state;
 	private BossBar chargeBar;
 	private Vector direction;
+	@Attribute(Attribute.DURATION)
 	private double duration;
+	@Attribute(Attribute.SPEED)
 	private double speed;
 	private boolean ignite;
 	private long flyStart;
 	private Set<LivingEntity> lit;
 	private double chargeFactor;
 	private Runnable onFlyStart;
+	private boolean checkForOnGround = false;
+	private boolean onGround = false;
+	private boolean checkedForJetBlastBlaze = false;
+	private int ticksOnGround;
+	@ConfigValue()
+	private int maxTicksOnGround = 10;
 
 	/**
 	 * This constructor is used to generate config values, do not use
@@ -100,8 +113,8 @@ public class FireJet extends OverriddenFireAbility implements AddonAbility {
 		ConfigValueHandler.get().setFields(this);
 		this.state = State.CHARGING;
 		this.chargeBar = Bukkit.getServer().createBossBar(CHARGE_BAR_TITLE, BarColor.WHITE, BarStyle.SEGMENTED_10);
-		this.chargeBar.addPlayer(player);
 		this.chargeBar.setProgress(0);
+		this.chargeBar.addPlayer(player);
 		this.direction = player.getLocation().getDirection();
 		start();
 	}
@@ -138,14 +151,11 @@ public class FireJet extends OverriddenFireAbility implements AddonAbility {
 		}
 
 		// get the difference between the max and min charge time
-		double chargeDuration = maxChargeTime - minChargeTime;
+		double chargeDuration = maxChargeTime;
 		// subtract the minimum charge time from the time since start
 		double actualChargeTime = timeSinceStart - minChargeTime;
-		if (actualChargeTime <= 0) {
-			return;
-		}
 
-		double progress = bPlayer.isAvatarState() ? 1 : actualChargeTime / chargeDuration;
+		double progress = bPlayer.isAvatarState() ? 1 : timeSinceStart / chargeDuration;
 		// clamp progress in between 0 and 1
 		this.chargeBar.setProgress(clamp(progress));
 
@@ -185,7 +195,23 @@ public class FireJet extends OverriddenFireAbility implements AddonAbility {
 		}
 	}
 
+	private void checkForJetBlastBlaze() {
+		if (CoreAbility.hasAbility(player, JetBlast.class)) {
+			JetBlast jetBlast = CoreAbility.getAbility(player, JetBlast.class);
+			duration = jetBlast.getDuration();
+			speed = jetBlast.getSpeed();
+		} else if (CoreAbility.hasAbility(player, JetBlaze.class)) {
+			JetBlaze jetBlaze = CoreAbility.getAbility(player, JetBlaze.class);
+			duration = jetBlaze.getDuration();
+			speed = jetBlaze.getSpeed();
+		}
+	}
+
 	private void handleFlying() {
+		if (!checkedForJetBlastBlaze) {
+			checkForJetBlastBlaze();
+			checkedForJetBlastBlaze = true;
+		}
 		long flyTime = System.currentTimeMillis() - this.flyStart;
 		if (flyTime > this.duration && !bPlayer.isAvatarState()) {
 			removeWithCooldown();
@@ -217,9 +243,28 @@ public class FireJet extends OverriddenFireAbility implements AddonAbility {
 					e.setFireTicks(fireTicks);
 				});
 		}
+		if (!checkForOnGround && flyTime > 250) {
+			checkForOnGround = true;
+		}
+		if (checkForOnGround) {
+			if (!onGround && player.isOnGround()) {
+				onGround = true;
+				ticksOnGround = 1;
+			} else if (onGround && player.isOnGround()) {
+				ticksOnGround++;
+				if (ticksOnGround > maxTicksOnGround) {
+					removeWithCooldown();
+				}
+			} else if (onGround && !player.isOnGround()) {
+				ticksOnGround = 0;
+				onGround = false;
+			}
+		}
 	}
 
 	private void playParticles() {
+		// I'd like to rewrite this so it's all behind the feet and lower to the ground, so it's more like the ground is being lit on fire
+		// fewer particles too
 		Particle particle = bPlayer.hasSubElement(Element.SubElement.BLUE_FIRE) ? Particle.SOUL_FIRE_FLAME : Particle.FLAME;
 		int amount = 15;
 		double offset = .8;
@@ -315,6 +360,10 @@ public class FireJet extends OverriddenFireAbility implements AddonAbility {
 		return this.state;
 	}
 
+	public long getMaxChargeTime() {
+		return maxChargeTime;
+	}
+
 	private double clamp(double v) {
 		return Math.max(0, Math.min(1, v));
 	}
@@ -348,13 +397,14 @@ public class FireJet extends OverriddenFireAbility implements AddonAbility {
 	public void load() {
 		super.load();
 		listener = new FireJetListener(this);
-		FireUtil.registerLanguage(this, "This ability provides a firebender with great mobility and repositioning options. This move has 2 use with their own cooldowns.",
-			"\nJet: This function allows a firebender to fly using jets of fire. To use, hold shift. A bar will appear at the top of your screen to show charging progress. " +
+		FireUtil.registerLanguage(this, "FireJet gives firebenders great mobility and repositioning options through this ability and its combos.",
+			"\n§cJet: §fThis function allows a firebender to fly using jets of fire. To use, hold shift. A bar will appear at the top of your screen to show charging progress. " +
 			"At any point you can let go to start the move. The fuller the bar, the faster and longer you will fly. Switching slots during flight does not cancel the " +
 			"move, but instead locks the direction. Making turns during flight is limited to a certain angle.\n" +
-			"Dash: This function allows a firebender to make a single large jump in a direction. To do this, simply left click. Shortly after activating this and while still " +
+			"§cDash: §fThis function allows a firebender to make a single large jump in a direction. To do this, simply left click. Shortly after activating this and while still " +
 			"in the air, you may hold shift. When you do this, you start surfing across the ground for a longer period of time. Changing slots is also possible during this, " +
-			"and will also lock your direction. However, you must hold shift, or this move will stop.");
+			"and will also lock your direction. However, you must hold shift, or this move will stop.\n" +
+			"§cFireJet Jet and FireJet Dash have separate cooldowns!");
 		ConfigValueHandler.get().registerDefaultValues(new FireJet(), null);
 	}
 

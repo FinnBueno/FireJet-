@@ -14,6 +14,7 @@ import me.finnbueno.firejetplus.util.FireUtil;
 import me.finnbueno.firejetplus.util.OverriddenFireAbility;
 import org.bukkit.Location;
 import org.bukkit.Particle;
+import org.bukkit.Sound;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.event.entity.EntityDamageEvent;
@@ -105,6 +106,7 @@ public class FireStomp extends OverriddenFireAbility implements ComboAbility, Ad
 		}
 
 		playFirebendingSound(center);
+		player.getWorld().playSound(center, Sound.ENTITY_GENERIC_EXPLODE, 1, 2);
 
 		GeneralMethods.getEntitiesAroundPoint(center, radius)
 			.stream()

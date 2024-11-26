@@ -211,11 +211,6 @@ public class FireSki extends OverriddenFireAbility implements AddonAbility {
 	}
 
 	@Override
-	public boolean isEnabled() {
-		return enabled;
-	}
-
-	@Override
 	public long getCooldown() {
 		return cooldown;
 	}
